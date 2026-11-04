@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumina Reader - Interactive Web e-Book Reader</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Merriweather', 'serif'],
+                        lora: ['Lora', 'serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        sepia: {
+                            50: '#FBF9F5',
+                            100: '#F4ECD8',
+                            200: '#E6D7B8',
+                            800: '#4A3B32',
+                            900: '#2C221E',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Theme Configurations */
+        body.theme-light {
+            background-color: #F8FAFC;
+            color: #1E293B;
+        }
+        body.theme-sepia {
+            background-color: #F4ECD8;
+            color: #4A3B32;
+        }
+        body.theme-dark {
+            background-color: #0F172A;
+            color: #E2E8F0;
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel-light {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+        .glass-panel-sepia {
+            background: rgba(244, 236, 216, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(230, 215, 184, 0.5);
+        }
+        .glass-panel-dark {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+
+        /* Smooth UI transitions */
+        .transition-ui {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Page Flip Animation */
+        .page-content {
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body id="appBody" class="theme-light h-full font-serif overflow-hidden select-none transition-colors duration-300">
+
+    <!-- APP WRAPPER -->
+    <div class="relative h-full w-full flex flex-col justify-between overflow-hidden">
+
+        <!-- TOP BAR / HEADER -->
+        <header id="headerBar" class="glass-panel-light transition-ui fixed top-0 left-0 right-0 z-30 px-4 py-3 flex items-center justify-between shadow-sm">
+            <div class="flex items-center space-x-3">
+                <button id="btnChapterDrawer" class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition" title="Table of Contents">
+                    <i class="fa-solid fa-bars-staggered text-lg"></i>
+                </button>
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-book-open text-amber-500"></i>
+                    <span id="bookTitle" class="font-sans font-bold text-sm sm:text-base tracking-tight truncate max-w-[180px] sm:max-w-xs">
+                        The Solitary Path
+                    </span>
+                </div>
+            </div>
+
+            <!-- Header Action Tools -->
+            <div class="flex items-center space-x-1 sm:space-x-2">
+                <button id="btnBookmark" class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition text-amber-500" title="Bookmark Page">
+                    <i id="bookmarkIcon" class="fa-regular fa-bookmark text-lg"></i>
+                </button>
+                <button id="btnSettings" class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition" title="Reader Settings">
+                    <i class="fa-solid fa-font text-lg"></i>
+                </button>
+                <button id="btnFullscreen" class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition hidden sm:inline-block" title="Toggle Fullscreen">
+                    <i class="fa-solid fa-expand text-lg"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN READING CANVAS CONTAINER -->
+        <main id="readerContainer" class="flex-1 flex justify-center items-center px-4 sm:px-12 md:px-20 lg:px-32 pt-20 pb-24 overflow-y-auto cursor-pointer">
+            <div id="bookView" class="w-full max-w-3xl min-h-[60vh] flex flex-col justify-between">
+                <!-- Dynamic Chapter Header -->
+                <div class="mb-6 pb-2 border-b border-black/10 dark:border-white/10 flex justify-between items-center font-sans text-xs opacity-60">
+                    <span id="currentChapterTitle">Chapter 1 • The Journey Begins</span>
+                    <span id="readingTimeEstimate">~3 min read</span>
+                </div>
+
+                <!-- Main Book Text Body -->
+                <div id="textContent" class="page-content text-justify leading-relaxed tracking-normal font-normal">
+                    <!-- Dynamic Page Text Rendered via JS -->
+                </div>
+
+                <!-- Page Footer info -->
+                <div class="mt-8 pt-4 border-t border-black/10 dark:border-white/10 flex justify-between items-center font-sans text-xs opacity-60">
+                    <span id="footerBookTitle">The Solitary Path</span>
+                    <span>Page <span id="currentPageNum">1</span> of <span id="totalPagesNum">25</span></span>
+                </div>
+            </div>
+        </main>
+
+        <!-- READING PROGRESS TOP THIN BAR -->
+        <div class="fixed top-[57px] left-0 right-0 h-1 bg-black/5 dark:bg-white/5 z-20">
+            <div id="progressBar" class="h-full bg-amber-500 transition-all duration-300 w-0"></div>
+        </div>
+
+        <!-- BOTTOM CONTROL BAR -->
+        <footer id="footerBar" class="glass-panel-light transition-ui fixed bottom-0 left-0 right-0 z-30 px-4 py-3 flex flex-col gap-2 shadow-lg">
+            <!-- Navigation Controls & Slider -->
+            <div class="max-w-4xl mx-auto w-full flex items-center justify-between gap-4">
+                <button id="btnPrevPage" class="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-chevron-left text-base sm:text-lg"></i>
+                </button>
+
+                <div class="flex-1 flex items-center gap-3">
+                    <span id="pageCounterMin" class="font-sans text-xs opacity-70 w-8 text-right">1</span>
+                    <input id="pageSlider" type="range" min="1" max="25" value="1" class="w-full h-1.5 bg-black/10 dark:bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                    <span id="pageCounterMax" class="font-sans text-xs opacity-70 w-8">25</span>
+                </div>
+
+                <button id="btnNextPage" class="p-2.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-chevron-right text-base sm:text-lg"></i>
+                </button>
+            </div>
+        </footer>
+
+        <!-- DRAWER: CHAPTERS & BOOKMARKS OVERLAY -->
+        <div id="drawerBackdrop" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300"></div>
+        <aside id="chapterDrawer" class="fixed top-0 bottom-0 left-0 w-80 max-w-[85vw] glass-panel-light z-50 transform -translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+            <!-- Drawer Header -->
+            <div class="p-4 border-b border-black/10 dark:border-white/10 flex items-center justify-between">
+                <div class="flex gap-2 p-1 bg-black/5 dark:bg-white/10 rounded-lg font-sans text-xs font-medium w-full">
+                    <button id="tabChapters" class="flex-1 py-1.5 rounded-md bg-white dark:bg-slate-800 shadow-sm text-center">Contents</button>
+                    <button id="tabBookmarks" class="flex-1 py-1.5 rounded-md text-center opacity-70 hover:opacity-100">Bookmarks</button>
+                </div>
+                <button id="btnCloseDrawer" class="ml-2 p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Chapters List View -->
+            <div id="viewChapters" class="flex-1 overflow-y-auto p-4 space-y-2 font-sans text-sm">
+                <!-- Chapters loaded dynamically -->
+            </div>
+
+            <!-- Bookmarks List View -->
+            <div id="viewBookmarks" class="flex-1 overflow-y-auto p-4 space-y-2 font-sans text-sm hidden">
+                <div id="bookmarksEmptyState" class="text-center py-10 opacity-50">
+                    <i class="fa-regular fa-bookmark text-3xl mb-2"></i>
+                    <p>No bookmarks saved yet.</p>
+                </div>
+                <div id="bookmarksList" class="space-y-2"></div>
+            </div>
+        </aside>
+
+        <!-- SETTINGS MODAL DIALOG -->
+        <div id="settingsBackdrop" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300"></div>
+        <div id="settingsModal" class="fixed bottom-0 sm:bottom-auto sm:top-1/2 left-1/2 transform -translate-x-1/2 sm:-translate-y-1/2 w-full sm:w-96 glass-panel-light rounded-t-2xl sm:rounded-2xl z-50 p-6 shadow-2xl translate-y-full sm:translate-y-0 sm:scale-95 opacity-0 transition-all duration-300">
+            <div class="flex justify-between items-center pb-4 border-b border-black/10 dark:border-white/10 font-sans">
+                <h3 class="font-bold text-base">Reading Appearance</h3>
+                <button id="btnCloseSettings" class="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="py-4 space-y-5 font-sans text-xs">
+                <!-- Theme Selectors -->
+                <div>
+                    <label class="block font-medium opacity-70 mb-2">THEME</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-theme="light" class="btn-theme flex items-center justify-center gap-2 p-2.5 rounded-xl border border-gray-300 bg-white text-slate-800 font-medium shadow-sm">
+                            <i class="fa-solid fa-sun text-amber-500"></i> Light
+                        </button>
+                        <button data-theme="sepia" class="btn-theme flex items-center justify-center gap-2 p-2.5 rounded-xl border border-amber-200 bg-[#F4ECD8] text-[#4A3B32] font-medium">
+                            <i class="fa-solid fa-coffee text-amber-700"></i> Sepia
+                        </button>
+                        <button data-theme="dark" class="btn-theme flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 font-medium">
+                            <i class="fa-solid fa-moon text-indigo-400"></i> Dark
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Font Family Selection -->
+                <div>
+                    <label class="block font-medium opacity-70 mb-2">TYPOGRAPHY</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-font="font-serif" class="btn-font p-2 rounded-xl border border-black/10 dark:border-white/10 font-serif text-sm">Merriweather</button>
+                        <button data-font="font-lora" class="btn-font p-2 rounded-xl border border-black/10 dark:border-white/10 font-lora text-sm">Lora</button>
+                        <button data-font="font-sans" class="btn-font p-2 rounded-xl border border-black/10 dark:border-white/10 font-sans text-sm">Inter</button>
+                    </div>
+                </div>
+
+                <!-- Font Size Controls -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-medium opacity-70">FONT SIZE</label>
+                        <span id="fontSizeDisplay" class="font-mono text-xs">18px</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs">A</span>
+                        <input id="sliderFontSize" type="range" min="14" max="28" value="18" class="w-full h-1.5 bg-black/10 dark:bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                        <span class="text-base font-bold">A</span>
+                    </div>
+                </div>
+
+                <!-- Line Spacing Controls -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-medium opacity-70">LINE SPACING</label>
+                        <span id="lineHeightDisplay" class="font-mono text-xs">1.8</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-spacing="leading-tight" class="btn-spacing p-2 rounded-xl border border-black/10 dark:border-white/10">Compact</button>
+                        <button data-spacing="leading-relaxed" class="btn-spacing p-2 rounded-xl border border-black/10 dark:border-white/10">Normal</button>
+                        <button data-spacing="leading-loose" class="btn-spacing p-2 rounded-xl border border-black/10 dark:border-white/10">Spacious</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTIFICATION TOAST TO SHOW SAVED ACTIONS -->
+        <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 glass-panel-dark text-white text-xs px-4 py-2 rounded-full shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 z-50 flex items-center gap-2">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toastMsg">Bookmark added</span>
+        </div>
+
+    </div>
+
+    <!-- APPLICATION LOGIC & BOOK ENGINE -->
+    <script>
+        // Sample e-Book Content Database
+        const bookData = {
+            title: "The Solitary Path",
+            author: "Elena Rostova",
+            chapters: [
+                { id: 1, title: "Chapter 1: The Gathering Shadows", startPage: 1 },
+                { id: 2, title: "Chapter 2: Echoes of the Past", startPage: 6 },
+                { id: 3, title: "Chapter 3: Beyond the Valley", startPage: 11 },
+                { id: 4, title: "Chapter 4: Whispers in the Wind", startPage: 16 },
+                { id: 5, title: "Chapter 5: The Dawn Awakening", startPage: 21 },
+            ],
+            pages: [
+                // Chapter 1
+                "The sun was dipping low over the ancient forest, casting long, golden shadows across the cobblestone pathway. Silence settled over the towering pine trees, broken only by the quiet rustle of autumn leaves shifting in the gentle evening breeze.\n\nIt had been years since anyone had traveled down this road. The old stones, once polished by thousands of carriage wheels and merchant boots, were now overgrown with moss and forgotten by time.",
+                "Yet, deep within the heart of the valley, a single lantern flared to life. Its warm glow cut through the gathering twilight, signaling that the long-awaited arrival was finally at hand.\n\nEach step taken down this path unlocked forgotten memories, reminding the solitary traveler of promises made in a different lifetime. The journey ahead was filled with uncertainty, but turning back was no longer an option.",
+                "High above, the first stars began to pierce through the twilight sky. The chill of the night air deepened, bringing with it the faint scent of ozone and distant ocean rain. She wrapped her heavy wool coat tighter around her shoulders, keeping her eyes fixed on the distant horizon.",
+                "Every traveler carries a story written in silent choices. Some search for lost glory, while others merely seek refuge from memories that refuse to fade. For Clara, the mountains held neither glory nor refuge; they held only the truth.",
+                "As she crested the ridge, the panorama of the sleeping valley unfolded beneath her. Hundreds of dim roof lights flickered like grounded stars in the sea of mist. This was Eldenwood—the sanctuary of ancient knowledge.",
+
+                // Chapter 2
+                "The city gate stood open, as if expecting her arrival. Iron lanterns flickered overhead, suspended by weathered chains that groaned with every breath of the wind. A lonely guard glanced up, nodding silently as she passed through.",
+                "Eldenwood's streets were narrow and winding, lined with tall timber-frame houses that leaned toward one another like old friends sharing secrets. The smell of freshly baked rye bread and woodsmoke filled the night air.",
+                "She navigated the labyrinthine alleys with practiced ease, turning left at the apothecary with its swinging brass sign, then right toward the grand courtyard where the ancient fountain bubbled steadily.",
+                "At the center of the square stood the Great Archive, its marble steps worn smooth by centuries of scholars. Its grand oak doors were sealed with iron bands, bearing the crest of the Keepers.",
+                "Clara pulled a silver key from her collar—an heirloom passed through four generations of guardians. As the key turned in the lock, the heavy doors opened with a deep, resonant hum.",
+
+                // Chapter 3
+                "Inside, the library stretched upward into shadow, floor after floor of leather-bound volumes, glowing crystal globes, and spiraling brass staircases. The air tasted of parchment, ink, and ancient dust.",
+                "She ascended to the third tier, where the astronomical records were kept. The floorboards creaked softly under her boots as she searched for shelf 42—the section dedicated to celestial anomalies.",
+                "There, tucked between two heavy folios on planetary motion, was the manuscript she sought: *The Chronicle of the Sunken Citadel*. Its cover was cold to the touch, inlaid with lapis lazuli.",
+                "Opening the manuscript revealed intricate maps drawn in shimmering silver ink. Constellations were mapped against mountain ranges, pointing toward a forgotten ruin hidden beneath the northern ice caps.",
+                "The text spoke of an ancient power—not a weapon, but a reservoir of harmony capable of restoring balance to lands stricken by drought and decay.",
+
+                // Chapter 4
+                "By dawn, Clara had copied the essential maps onto light parchment. The morning light filtered through the stained-glass windows, casting vibrant mosaic patterns across the stone floor.",
+                "Leaving the Archive before the city awoke, she secured fresh supplies from the market: dried fruit, travel bread, climbing ropes, and an oilskin cloak to shield against northern blizzards.",
+                "The road north climbed steeply into the Frostfang Peaks. As trees gave way to barren rock and snowdrifts, the quiet became absolute. Here, even the wind seemed to speak in hushed tones.",
+                "On the third day of climbing, she discovered the entrance to the pass—a narrow fissure in the cliffside hidden behind a frozen waterfall. Icicles hung like crystal daggers over the threshold.",
+                "Squeezing through the icy portal, she stepped out onto a hidden plateau. Below lay the ruins of the Sunken Citadel, its spires encased in clear blue ice that glistened under the arctic sun.",
+
+                // Chapter 5
+                "Descend into the ruins was perilous, but the ancient stone stairways remained intact. Down in the central chamber, a subterranean thermal spring kept the core of the citadel surprisingly warm.",
+                "At the center of the hall floated a sphere of pure, luminous light—the Heart of the Valley. It hummed with a soft, musical frequency that vibrated gently through the stone beneath her feet.",
+                "Clara extended her hand toward the light. As her fingertips brushed its outer aura, a wave of warmth surged through her, dissipating the exhaustion of her long journey.",
+                "The knowledge of generations flooded into her mind, revealing how to mend the shattered Leylines that sustained the surrounding farmlands. The solitude had ended; her true purpose had begun.",
+                "With the Heart reactivated, light streamed upward through the ice spires, casting a radiant aurora across the northern sky. Eldenwood would flourish once more, guided by the reader of the stars."
+            ]
+        };
+
+        // Application State
+        let state = {
+            currentPage: 1,
+            totalPages: bookData.pages.length,
+            theme: 'light', // light, sepia, dark
+            fontFamily: 'font-serif',
+            fontSize: 18,
+            lineSpacing: 'leading-relaxed',
+            controlsVisible: true,
+            bookmarks: [] // Saved page numbers
+        };
+
+        // UI Element References
+        const elements = {
+            body: document.getElementById('appBody'),
+            header: document.getElementById('headerBar'),
+            footer: document.getElementById('footerBar'),
+            readerContainer: document.getElementById('readerContainer'),
+            textContent: document.getElementById('textContent'),
+            currentChapterTitle: document.getElementById('currentChapterTitle'),
+            currentPageNum: document.getElementById('currentPageNum'),
+            totalPagesNum: document.getElementById('totalPagesNum'),
+            progressBar: document.getElementById('progressBar'),
+            pageSlider: document.getElementById('pageSlider'),
+            pageCounterMin: document.getElementById('pageCounterMin'),
+            pageCounterMax: document.getElementById('pageCounterMax'),
+            btnPrev: document.getElementById('btnPrevPage'),
+            btnNext: document.getElementById('btnNextPage'),
+            btnBookmark: document.getElementById('btnBookmark'),
+            bookmarkIcon: document.getElementById('bookmarkIcon'),
+            
+            // Drawers & Modals
+            chapterDrawer: document.getElementById('chapterDrawer'),
+            drawerBackdrop: document.getElementById('drawerBackdrop'),
+            btnChapterDrawer: document.getElementById('btnChapterDrawer'),
+            btnCloseDrawer: document.getElementById('btnCloseDrawer'),
+            tabChapters: document.getElementById('tabChapters'),
+            tabBookmarks: document.getElementById('tabBookmarks'),
+            viewChapters: document.getElementById('viewChapters'),
+            viewBookmarks: document.getElementById('viewBookmarks'),
+            bookmarksList: document.getElementById('bookmarksList'),
+            bookmarksEmptyState: document.getElementById('bookmarksEmptyState'),
+
+            settingsModal: document.getElementById('settingsModal'),
+            settingsBackdrop: document.getElementById('settingsBackdrop'),
+            btnSettings: document.getElementById('btnSettings'),
+            btnCloseSettings: document.getElementById('btnCloseSettings'),
+            sliderFontSize: document.getElementById('sliderFontSize'),
+            fontSizeDisplay: document.getElementById('fontSizeDisplay'),
+            lineHeightDisplay: document.getElementById('lineHeightDisplay'),
+            toast: document.getElementById('toast'),
+            toastMsg: document.getElementById('toastMsg'),
+            btnFullscreen: document.getElementById('btnFullscreen')
+        };
+
+        // Initialize App
+        function init() {
+            loadLocalStorage();
+            renderChaptersList();
+            updatePageContent();
+            applySettings();
+            setupEventListeners();
+        }
+
+        // Render Current Page Text & Meta Data
+        function updatePageContent() {
+            // Animation reset
+            elements.textContent.classList.remove('page-content');
+            void elements.textContent.offsetWidth; // Trigger reflow
+            elements.textContent.classList.add('page-content');
+
+            // Format Paragraphs
+            const rawText = bookData.pages[state.currentPage - 1];
+            const formattedHTML = rawText.split('\n\n').map(paragraph => `<p class="mb-4">${paragraph}</p>`).join('');
+            elements.textContent.innerHTML = formattedHTML;
+
+            // Update Page Indicators
+            elements.currentPageNum.innerText = state.currentPage;
+            elements.totalPagesNum.innerText = state.totalPages;
+            elements.pageSlider.value = state.currentPage;
+            elements.pageCounterMin.innerText = state.currentPage;
+
+            // Calculate Progress Bar
+            const progressPercent = (state.currentPage / state.totalPages) * 100;
+            elements.progressBar.style.width = `${progressPercent}%`;
+
+            // Detect Current Chapter
+            let currentChapter = bookData.chapters[0];
+            for (let chap of bookData.chapters) {
+                if (state.currentPage >= chap.startPage) {
+                    currentChapter = chap;
+                }
+            }
+            elements.currentChapterTitle.innerText = currentChapter.title;
+
+            // Navigation Button States
+            elements.btnPrev.disabled = state.currentPage === 1;
+            elements.btnNext.disabled = state.currentPage === state.totalPages;
+
+            // Update Bookmark Active State
+            updateBookmarkIcon();
+
+            // Save Progress
+            saveLocalStorage();
+        }
+
+        // Navigation Handlers
+        function nextPage() {
+            if (state.currentPage < state.totalPages) {
+                state.currentPage++;
+                updatePageContent();
+            }
+        }
+
+        function prevPage() {
+            if (state.currentPage > 1) {
+                state.currentPage--;
+                updatePageContent();
+            }
+        }
+
+        function goToPage(pageNumber) {
+            state.currentPage = Math.min(Math.max(parseInt(pageNumber), 1), state.totalPages);
+            updatePageContent();
+        }
+
+        // Toggle Bookmark Status for Current Page
+        function toggleBookmark() {
+            const page = state.currentPage;
+            const index = state.bookmarks.indexOf(page);
+            if (index === -1) {
+                state.bookmarks.push(page);
+                state.bookmarks.sort((a, b) => a - b);
+                showToast(`Page ${page} bookmarked`);
+            } else {
+                state.bookmarks.splice(index, 1);
+                showToast(`Bookmark removed`);
+            }
+            updateBookmarkIcon();
+            renderBookmarksList();
+            saveLocalStorage();
+        }
+
+        function updateBookmarkIcon() {
+            const isBookmarked = state.bookmarks.includes(state.currentPage);
+            if (isBookmarked) {
+                elements.bookmarkIcon.className = "fa-solid fa-bookmark text-lg text-amber-500";
+            } else {
+                elements.bookmarkIcon.className = "fa-regular fa-bookmark text-lg";
+            }
+        }
+
+        // Theme and Appearance Modifications
+        function setTheme(themeName) {
+            state.theme = themeName;
+            elements.body.className = `theme-${themeName} h-full ${state.fontFamily} overflow-hidden select-none transition-colors duration-300`;
+
+            // Adjust Panels Theme Classes
+            const panels = [elements.header, elements.footer, elements.chapterDrawer, elements.settingsModal];
+            panels.forEach(panel => {
+                panel.classList.remove('glass-panel-light', 'glass-panel-sepia', 'glass-panel-dark');
+                panel.classList.add(`glass-panel-${themeName}`);
+            });
+
+            saveLocalStorage();
+        }
+
+        function setFontFamily(fontClass) {
+            state.fontFamily = fontClass;
+            elements.textContent.className = `page-content text-justify ${state.lineSpacing} ${fontClass}`;
+            saveLocalStorage();
+        }
+
+        function setFontSize(size) {
+            state.fontSize = size;
+            elements.textContent.style.fontSize = `${size}px`;
+            elements.fontSizeDisplay.innerText = `${size}px`;
+            saveLocalStorage();
+        }
+
+        function setLineSpacing(spacingClass) {
+            state.lineSpacing = spacingClass;
+            elements.textContent.className = `page-content text-justify ${spacingClass} ${state.fontFamily}`;
+            
+            let label = "Normal";
+            if (spacingClass === 'leading-tight') label = "Compact";
+            if (spacingClass === 'leading-loose') label = "Spacious";
+            elements.lineHeightDisplay.innerText = label;
+
+            saveLocalStorage();
+        }
+
+        function applySettings() {
+            setTheme(state.theme);
+            setFontFamily(state.fontFamily);
+            setFontSize(state.fontSize);
+            setLineSpacing(state.lineSpacing);
+            elements.sliderFontSize.value = state.fontSize;
+        }
+
+        // Toggle UI Panels Visibility (Immersive Mode)
+        function toggleControls() {
+            state.controlsVisible = !state.controlsVisible;
+            if (state.controlsVisible) {
+                elements.header.classList.remove('-translate-y-full');
+                elements.footer.classList.remove('translate-y-full');
+            } else {
+                elements.header.classList.add('-translate-y-full');
+                elements.footer.classList.add('translate-y-full');
+            }
+        }
+
+        // Populate Table of Contents
+        function renderChaptersList() {
+            elements.viewChapters.innerHTML = bookData.chapters.map(chap => `
+                <button onclick="goToPage(${chap.startPage}); closeDrawer();" class="w-full text-left p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition flex items-center justify-between group">
+                    <span class="font-medium truncate">${chap.title}</span>
+                    <span class="text-xs opacity-50 group-hover:opacity-100">p. ${chap.startPage}</span>
+                </button>
+            `).join('');
+        }
+
+        // Populate Bookmarks List
+        function renderBookmarksList() {
+            if (state.bookmarks.length === 0) {
+                elements.bookmarksEmptyState.classList.remove('hidden');
+                elements.bookmarksList.innerHTML = '';
+            } else {
+                elements.bookmarksEmptyState.classList.add('hidden');
+                elements.bookmarksList.innerHTML = state.bookmarks.map(page => `
+                    <div class="p-3 rounded-xl border border-black/10 dark:border-white/10 flex items-center justify-between hover:bg-black/5 dark:hover:bg-white/10 transition">
+                        <button onclick="goToPage(${page}); closeDrawer();" class="flex-1 text-left">
+                            <span class="font-bold">Page ${page}</span>
+                            <p class="text-xs opacity-60 truncate">${bookData.pages[page - 1].substring(0, 40)}...</p>
+                        </button>
+                        <button onclick="state.bookmarks = state.bookmarks.filter(p => p !== ${page}); renderBookmarksList(); updateBookmarkIcon(); saveLocalStorage();" class="p-2 opacity-50 hover:opacity-100 text-red-500">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Drawer Controls
+        function openDrawer() {
+            elements.drawerBackdrop.classList.remove('hidden');
+            setTimeout(() => {
+                elements.drawerBackdrop.classList.remove('opacity-0');
+                elements.chapterDrawer.classList.remove('-translate-x-full');
+            }, 10);
+        }
+
+        function closeDrawer() {
+            elements.chapterDrawer.classList.add('-translate-x-full');
+            elements.drawerBackdrop.classList.add('opacity-0');
+            setTimeout(() => {
+                elements.drawerBackdrop.classList.add('hidden');
+            }, 300);
+        }
+
+        // Settings Modal Controls
+        function openSettings() {
+            elements.settingsBackdrop.classList.remove('hidden');
+            setTimeout(() => {
+                elements.settingsBackdrop.classList.remove('opacity-0');
+                elements.settingsModal.classList.remove('translate-y-full', 'sm:scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeSettings() {
+            elements.settingsModal.classList.add('translate-y-full', 'sm:scale-95', 'opacity-0');
+            elements.settingsBackdrop.classList.add('opacity-0');
+            setTimeout(() => {
+                elements.settingsBackdrop.classList.add('hidden');
+            }, 300);
+        }
+
+        // Toast Messages
+        function showToast(msg) {
+            elements.toastMsg.innerText = msg;
+            elements.toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                elements.toast.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // Storage Management
+        function saveLocalStorage() {
+            localStorage.setItem('lumina_reader_state', JSON.stringify({
+                currentPage: state.currentPage,
+                theme: state.theme,
+                fontFamily: state.fontFamily,
+                fontSize: state.fontSize,
+                lineSpacing: state.lineSpacing,
+                bookmarks: state.bookmarks
+            }));
+        }
+
+        function loadLocalStorage() {
+            const saved = localStorage.getItem('lumina_reader_state');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                } catch (e) {
+                    console.error("Could not parse saved storage data", e);
+                }
+            }
+        }
+
+        // Event Listeners Registration
+        function setupEventListeners() {
+            // Main Controls
+            elements.btnNext.addEventListener('click', nextPage);
+            elements.btnPrev.addEventListener('click', prevPage);
+            elements.pageSlider.addEventListener('input', (e) => goToPage(e.target.value));
+            elements.btnBookmark.addEventListener('click', toggleBookmark);
+
+            // Toggle Controls on Reader Click (avoid when selecting text)
+            elements.readerContainer.addEventListener('click', (e) => {
+                if (window.getSelection().toString().length === 0) {
+                    toggleControls();
+                }
+            });
+
+            // Keyboard Shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' || e.key === ' ') nextPage();
+                if (e.key === 'ArrowLeft') prevPage();
+                if (e.key === 'b') toggleBookmark();
+                if (e.key === 'f') toggleControls();
+            });
+
+            // Drawers & Modals Triggers
+            elements.btnChapterDrawer.addEventListener('click', () => {
+                renderBookmarksList();
+                openDrawer();
+            });
+            elements.btnCloseDrawer.addEventListener('click', closeDrawer);
+            elements.drawerBackdrop.addEventListener('click', closeDrawer);
+
+            elements.btnSettings.addEventListener('click', openSettings);
+            elements.btnCloseSettings.addEventListener('click', closeSettings);
+            elements.settingsBackdrop.addEventListener('click', closeSettings);
+
+            // Drawer Tabs Toggle
+            elements.tabChapters.addEventListener('click', () => {
+                elements.viewChapters.classList.remove('hidden');
+                elements.viewBookmarks.classList.add('hidden');
+                elements.tabChapters.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm');
+                elements.tabChapters.classList.remove('opacity-70');
+                elements.tabBookmarks.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm');
+                elements.tabBookmarks.classList.add('opacity-70');
+            });
+
+            elements.tabBookmarks.addEventListener('click', () => {
+                elements.viewBookmarks.classList.remove('hidden');
+                elements.viewChapters.classList.add('hidden');
+                elements.tabBookmarks.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm');
+                elements.tabBookmarks.classList.remove('opacity-70');
+                elements.tabChapters.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm');
+                elements.tabChapters.classList.add('opacity-70');
+            });
+
+            // Appearance Controls Events
+            document.querySelectorAll('.btn-theme').forEach(btn => {
+                btn.addEventListener('click', () => setTheme(btn.dataset.theme));
+            });
+
+            document.querySelectorAll('.btn-font').forEach(btn => {
+                btn.addEventListener('click', () => setFontFamily(btn.dataset.font));
+            });
+
+            elements.sliderFontSize.addEventListener('input', (e) => setFontSize(e.target.value));
+
+            document.querySelectorAll('.btn-spacing').forEach(btn => {
+                btn.addEventListener('click', () => setLineSpacing(btn.dataset.spacing));
+            });
+
+            // Fullscreen Handler
+            elements.btnFullscreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {});
+                } else {
+                    document.exitFullscreen().catch(err => {});
+                }
+            });
+        }
+
+        // Run application on window load
+        window.onload = init;
+    </script>
+</body>
+</html>
